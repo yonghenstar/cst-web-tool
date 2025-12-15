@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打字速度测试</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* 核心动画 */
+        @keyframes blink {
+            50% { border-color: transparent; }
+        }
+        @keyframes pulse-light {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        /* 核心样式 */
+        .current { 
+            border-left: 3px solid #4F46E5; 
+            animation: blink 1s infinite;
+        }
+        .correct { color: #10B981; }
+        .incorrect { color: #EF4444; text-decoration: underline; }
+        .progress-bar {
+            height: 8px;
+            transition: width 0.3s ease-out;
+            border-radius: 9999px;
+        }
+        
+        /* 基础样式（兜底，避免Tailwind加载失败） */
+        .bg-primary { background-color: #4F46E5; }
+        .text-primary { color: #4F46E5; }
+        .bg-success { background-color: #10B981; }
+        .text-success { color: #10B981; }
+        .text-danger { color: #EF4444; }
+        .text-warning { color: #F59E0B; }
+        .bg-dark-800 { background-color: #1F2937; }
+        .bg-dark-900 { background-color: #111827; }
+        .dark .bg-dark-800 { background-color: #1F2937; }
+        .dark .bg-dark-900 { background-color: #111827; }
+        
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        .dark ::-webkit-scrollbar-track { background: #1f2937; }
+        .dark ::-webkit-scrollbar-thumb { background: #4b5563; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+    
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        success: '#10B981',
+                        danger: '#EF4444',
+                        warning: '#F59E0B',
+                        dark: {
+                            800: '#1F2937',
+                            900: '#111827'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- 预加载字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="font-sans bg-gray-50 dark:bg-dark-900 min-h-screen flex flex-col text-gray-800 dark:text-gray-100 transition-all">
+    <!-- 头部区域 -->
+    <header class="bg-primary text-white py-5 shadow-lg">
+        <div class="container mx-auto px-4 text-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold mb-1">极速打字测试</h1>
+            <p class="text-white/90 text-sm md:text-base max-w-md mx-auto">精准测试打字速度与准确率，高效提升输入效率</p>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-6 md:py-8">
+        <div class="max-w-4xl mx-auto bg-white dark:bg-dark-800 rounded-2xl shadow-md overflow-hidden p-5 md:p-7 transition-all">
+            <!-- 统计与控制区 -->
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <div class="stats grid grid-cols-3 gap-3 w-full md:w-auto">
+                    <div class="bg-gray-50 dark:bg-dark-700 rounded-xl p-3 text-center shadow-sm min-w-[90px] hover:shadow-md transition-all">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">剩余时间</div>
+                        <div id="timer" class="text-xl font-bold text-primary">60s</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-dark-700 rounded-xl p-3 text-center shadow-sm min-w-[90px] hover:shadow-md transition-all">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">打字速度</div>
+                        <div id="wpm" class="text-xl font-bold text-primary">0 WPM</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-dark-700 rounded-xl p-3 text-center shadow-sm min-w-[90px] hover:shadow-md transition-all">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">准确率</div>
+                        <div id="accuracy" class="text-xl font-bold text-primary">100%</div>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button id="theme-toggle" class="bg-gray-200 dark:bg-dark-700 hover:bg-gray-300 dark:hover:bg-dark-600 p-2 rounded-lg transition-all w-10 h-10 flex items-center justify-center">
+                        <i class="fas fa-moon dark:fa-sun"></i>
+                    </button>
+                    <button id="restart-btn" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-all flex items-center gap-1 shadow-sm hover:shadow">
+                        <i class="fas fa-redo"></i>
+                        <span class="hidden sm:inline">重新开始</span>
+                        <span class="sm:hidden">重置</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="mb-5">
+                <div class="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2 overflow-hidden">
+                    <div id="progress-bar" class="progress-bar bg-primary" style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">测试进度: <span id="progress-text">0%</span></p>
+            </div>
+
+            <!-- 打字区域 -->
+            <div class="mb-6 space-y-3">
+                <div id="quote-display" class="bg-gray-50 dark:bg-dark-700 p-5 rounded-xl text-lg leading-relaxed h-36 overflow-y-auto shadow-sm border border-gray-100 dark:border-gray-700"></div>
+                
+                <textarea 
+                    id="quote-input" 
+                    class="w-full p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none transition-all dark:bg-dark-700 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" 
+                    rows="4" 
+                    placeholder="点击输入开始测试（输入首个字符即计时）" 
+                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                ></textarea>
+                
+                <div id="input-hint" class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <i class="fas fa-info-circle text-primary text-sm"></i>
+                    <span>错误字符标红，正确字符标绿，专注输入提升准确率</span>
+                </div>
+            </div>
+
+            <!-- 结果面板 -->
+            <div id="result-panel" class="hidden bg-success/10 dark:bg-success/20 border-l-4 border-success p-4 mb-5 rounded-r-xl shadow-sm transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-semibold text-success flex items-center gap-1">
+                        <i class="fas fa-trophy"></i> 测试完成!
+                    </h3>
+                    <span class="text-xs bg-success/20 text-success px-2 py-1 rounded-full">
+                        <i class="fas fa-clock mr-1"></i>
+                        <span id="test-duration">60</span>秒
+                    </span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white dark:bg-dark-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <span class="text-xs text-gray-600 dark:text-gray-400">打字速度</span>
+                        <span id="final-wpm" class="block text-2xl font-bold text-success mt-1">0 WPM</span>
+                    </div>
+                    <div class="bg-white dark:bg-dark-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <span class="text-xs text-gray-600 dark:text-gray-400">准确率</span>
+                        <span id="final-accuracy" class="block text-2xl font-bold text-success mt-1">100%</span>
+                    </div>
+                    <div class="bg-white dark:bg-dark-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <span class="text-xs text-gray-600 dark:text-gray-400">总字数</span>
+                        <span id="total-chars" class="block text-2xl font-bold text-success mt-1">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 历史记录面板 -->
+            <div id="history-panel" class="hidden bg-primary/10 dark:bg-primary/20 border-l-4 border-primary p-4 rounded-r-xl shadow-sm transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-semibold text-primary flex items-center gap-1">
+                        <i class="fas fa-chart-line"></i> 历史记录
+                    </h3>
+                    <button id="clear-history" class="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-all">
+                        <i class="fas fa-trash"></i> 清空记录
+                    </button>
+                </div>
+                <div class="mt-2 bg-white dark:bg-dark-800 p-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <canvas id="history-chart" height="160"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚（版权信息） -->
+    <footer class="bg-dark-800 dark:bg-dark-900 text-gray-400 py-5">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+                <div class="text-center md:text-left">
+                    <p class="text-sm">© 2025 CST协会Code工会 | 打字速度测试 | 版权所有</p>
+                    <p class="text-xs mt-1 text-gray-500">Powered by 极速科技 | 隐私政策 | 使用条款</p>
+                </div>
+                <div class="flex space-x-4 text-sm">
+                    <a href="#" class="hover:text-white transition-colors"><i class="fas fa-question-circle mr-1"></i>QAQ>QA>
+                    <a href="https://cstx.zone.id" class="hover:text-white transition-colors"><i class="fas fa-envelope mr-1"></i>联系我们</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 等待DOM完全加载后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM元素缓存
+            const el = {
+                quoteDisplay: document.getElementById('quote-display'),
+                quoteInput: document.getElementById('quote-input'),
+                timer: document.getElementById('timer'),
+                wpm: document.getElementById('wpm'),
+                accuracy: document.getElementById('accuracy'),
+                restartBtn: document.getElementById('restart-btn'),
+                resultPanel: document.getElementById('result-panel'),
+                finalWpm: document.getElementById('final-wpm'),
+                finalAccuracy: document.getElementById('final-accuracy'),
+                totalChars: document.getElementById('total-chars'),
+                progressBar: document.getElementById('progress-bar'),
+                progressText: document.getElementById('progress-text'),
+                historyPanel: document.getElementById('history-panel'),
+                themeToggle: document.getElementById('theme-toggle'),
+                clearHistory: document.getElementById('clear-history'),
+                testDuration: document.getElementById('test-duration'),
+                inputHint: document.getElementById('input-hint'),
+                historyChart: document.getElementById('history-chart')
+            };
+
+            // 测试文本库
+            const quotes = [
+                "JavaScript是轻量级解释型编程语言，用于创建动态网页内容。",
+                "打字速度测试可评估输入效率，帮助提升工作和学习效率。",
+                "前端开发涉及HTML、CSS和JavaScript，构建用户界面与交互。",
+                "持续练习是提升打字速度的关键，建议每天训练15分钟。",
+                "CST协会Code工会NB",
+                "&^#@DAF":>?",
+                "我#@!FUCJ2@!#&_>P",
+                "现代Web应用采用响应式设计，适配各类设备的用户体验。"
+            ];
+
+            // 状态管理
+            let timerInterval;
+            let state = {
+                timeLeft: 60,
+                isTyping: false,
+                correctChars: 0,
+                totalTyped: 0,
+                currentQuote: '',
+                testHistory: JSON.parse(localStorage.getItem('typingTestHistory')) || [],
+                isDarkMode: localStorage.getItem('darkMode') === 'true',
+                chartInstance: null
+            };
+
+            // 初始化测试
+            function initTest() {
+                // 重置状态
+                clearInterval(timerInterval);
+                state = {
+                    ...state,
+                    timeLeft: 60,
+                    isTyping: false,
+                    correctChars: 0,
+                    totalTyped: 0
+                };
+
+                // 更新UI
+                el.timer.textContent = '60s';
+                el.wpm.textContent = '0 WPM';
+                el.accuracy.textContent = '100%';
+                el.quoteInput.value = '';
+                el.progressBar.style.width = '0%';
+                el.progressText.textContent = '0%';
+                el.resultPanel.classList.add('hidden');
+                el.resultPanel.classList.remove('animate-pulse-light');
+                el.inputHint.classList.remove('hidden');
+
+                // 随机选文本
+                state.currentQuote = quotes[Math.floor(Math.random() * quotes.length)];
+                renderQuote();
+
+                // 激活输入框
+                el.quoteInput.disabled = false;
+                el.quoteInput.focus();
+
+                // 销毁旧图表
+                if (state.chartInstance) {
+                    state.chartInstance.destroy();
+                    state.chartInstance = null;
+                }
+            }
+
+            // 渲染测试文本
+            function renderQuote() {
+                let html = '';
+                state.currentQuote.split('').forEach((char, index) => {
+                    html += `<span class="inline-block ${index === 0 ? 'current' : ''}">${char}</span>`;
+                });
+                el.quoteDisplay.innerHTML = html;
+            }
+
+            // 开始计时器
+            function startTimer() {
+                timerInterval = setInterval(() => {
+                    state.timeLeft--;
+                    el.timer.textContent = `${state.timeLeft}s`;
+
+                    // 更新进度
+                    const progress = Math.round(((60 - state.timeLeft) / 60) * 100);
+                    el.progressBar.style.width = `${progress}%`;
+                    el.progressText.textContent = `${progress}%`;
+
+                    if (state.timeLeft <= 0) finishTest();
+                }, 1000);
+            }
+
+            // 处理输入
+            function handleInput() {
+                if (!state.isTyping) {
+                    state.isTyping = true;
+                    startTimer();
+                    el.inputHint.classList.add('hidden');
+                }
+
+                const inputChars = el.quoteInput.value.split('');
+                state.totalTyped = inputChars.length;
+                state.correctChars = 0;
+
+                // 更新字符状态
+                const charNodes = el.quoteDisplay.querySelectorAll('span');
+                charNodes.forEach((span, index) => {
+                    const inputChar = inputChars[index];
+                    span.classList.remove('correct', 'incorrect', 'current');
+
+                    if (inputChar === undefined) {
+                        if (index === inputChars.length) span.classList.add('current');
+                    } else if (inputChar === span.textContent) {
+                        span.classList.add('correct');
+                        state.correctChars++;
+                    } else {
+                        span.classList.add('incorrect');
+                    }
+                });
+
+                // 计算统计数据
+                const accuracy = state.totalTyped > 0 ? Math.round((state.correctChars / state.totalTyped) * 100) : 100;
+                const wpm = state.totalTyped > 0 ? Math.round((state.correctChars / 5) / ((60 - state.timeLeft) / 60)) : 0;
+
+                // 更新UI
+                el.accuracy.textContent = `${accuracy}%`;
+                el.wpm.textContent = `${wpm} WPM`;
+
+                // 准确率颜色反馈
+                el.accuracy.className = 'text-xl font-bold ' + (
+                    accuracy >= 95 ? 'text-success' : 
+                    accuracy >= 80 ? 'text-warning' : 'text-danger'
+                );
+
+                // 完成检测
+                if (inputChars.length === state.currentQuote.length) finishTest();
+            }
+
+            // 完成测试
+            function finishTest() {
+                clearInterval(timerInterval);
+                state.isTyping = false;
+                el.quoteInput.disabled = true;
+
+                // 计算结果
+                const accuracy = state.totalTyped > 0 ? Math.round((state.correctChars / state.totalTyped) * 100) : 100;
+                const actualTime = 60 - state.timeLeft;
+                const wpm = actualTime > 0 ? Math.round((state.correctChars / 5) / (actualTime / 60)) : 0;
+
+                // 保存记录
+                const result = {
+                    date: new Date().toLocaleString(),
+                    wpm,
+                    accuracy,
+                    characters: state.totalTyped,
+                    correctCharacters: state.correctChars,
+                    duration: actualTime
+                };
+                state.testHistory.push(result);
+                if (state.testHistory.length > 10) state.testHistory = state.testHistory.slice(-10);
+                localStorage.setItem('typingTestHistory', JSON.stringify(state.testHistory));
+
+                // 更新结果面板
+                el.testDuration.textContent = actualTime;
+                el.finalWpm.textContent = `${wpm} WPM`;
+                el.finalAccuracy.textContent = `${accuracy}%`;
+                el.totalChars.textContent = state.totalTyped;
+                el.resultPanel.classList.remove('hidden');
+                el.resultPanel.style.animation = 'pulse-light 3s infinite';
+
+                // 结果颜色
+                el.finalAccuracy.className = 'block text-2xl font-bold ' + (
+                    accuracy >= 95 ? 'text-success' : 
+                    accuracy >= 80 ? 'text-warning' : 'text-danger'
+                ) + ' mt-1';
+
+                // 显示历史
+                showHistory();
+            }
+
+            // 显示历史记录
+            function showHistory() {
+                if (state.testHistory.length === 0) return;
+                el.historyPanel.classList.remove('hidden');
+
+                // 等待Chart.js加载
+                if (typeof Chart === 'undefined') {
+                    setTimeout(showHistory, 100);
+                    return;
+                }
+
+                // 销毁旧图表
+                if (state.chartInstance) state.chartInstance.destroy();
+
+                // 准备数据
+                const labels = state.testHistory.map((_, i) => `测试 ${i + 1}`);
+                const wpmData = state.testHistory.map(item => item.wpm);
+                const accuracyData = state.testHistory.map(item => item.accuracy);
+
+                // 主题适配
+                const textColor = state.isDarkMode ? '#e5e7eb' : '#1f2937';
+                const gridColor = state.isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+
+                // 创建图表
+                state.chartInstance = new Chart(el.historyChart, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: 'WPM',
+                                data: wpmData,
+                                borderColor: '#4F46E5',
+                                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: '准确率 %',
+                                data: accuracyData,
+                                borderColor: '#10B981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'WPM', color: textColor },
+                                ticks: { color: textColor },
+                                grid: { color: gridColor }
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                min: 0,
+                                max: 100,
+                                title: { display: true, text: '准确率 %', color: textColor },
+                                ticks: { color: textColor },
+                                grid: { drawOnChartArea: false }
+                            },
+                            x: {
+                                ticks: { color: textColor },
+                                grid: { color: gridColor }
+                            }
+                        },
+                        plugins: {
+                            legend: { labels: { color: textColor } }
+                        }
+                    }
+                });
+            }
+
+            // 清空历史记录
+            function clearHistory() {
+                if (confirm('确定清空所有历史记录？此操作不可恢复！')) {
+                    state.testHistory = [];
+                    localStorage.removeItem('typingTestHistory');
+                    el.historyPanel.classList.add('hidden');
+                    if (state.chartInstance) {
+                        state.chartInstance.destroy();
+                        state.chartInstance = null;
+                    }
+                }
+            }
+
+            // 切换主题
+            function toggleTheme() {
+                state.isDarkMode = !state.isDarkMode;
+                localStorage.setItem('darkMode', state.isDarkMode);
+                
+                if (state.isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                    el.themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    el.themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                }
+
+                if (state.chartInstance) showHistory();
+            }
+            function applyTheme() {
+                if (state.isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                    el.themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    el.themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                }
+            }
+
+            // 事件监听
+            el.quoteInput.addEventListener('input', handleInput);
+            el.restartBtn.addEventListener('click', initTest);
+            el.themeToggle.addEventListener('click', toggleTheme);
+            el.clearHistory.addEventListener('click', clearHistory);
+
+            // 移动端优化
+            document.addEventListener('click', (e) => {
+                if (e.target !== el.quoteInput && el.quoteInput === document.activeElement) {
+                    el.quoteInput.blur();
+                }
+            });
+            applyTheme();
+            initTest();
+        });
+    </script>
+</body>
+</html>
